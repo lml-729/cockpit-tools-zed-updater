@@ -1,0 +1,133 @@
+name: Follow official releases and publish stable Zed ordering
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['scripts/**', '.github/workflows/windows.yml']
+permissions:
+  contents: read
+concurrency:
+  group: cockpit-zed-release
+  cancel-in-progress: false
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      build: ${{ steps.upstream.outputs.build }}
+      tag: ${{ steps.upstream.outputs.tag }}
+      version: ${{ steps.upstream.outputs.version }}
+      sha: ${{ steps.upstream.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Resolve latest stable official source
+        id: upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/resolve.cjs
+      - name: Keep the release monitor active during quiet upstream periods
+        shell: bash
+        run: |
+          node -e 'const fs=require("fs");const p="monitor-heartbeat.txt";const previous=fs.existsSync(p)?Date.parse(fs.readFileSync(p,"utf8")):0;if(Date.now()-previous>30*86400000)fs.writeFileSync(p,new Date().toISOString()+"\n");'
+          git add monitor-heartbeat.txt
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Keep upstream release monitor active'
+            git push
+          fi
+      - uses: actions/upload-artifact@v4
+        if: steps.upstream.outputs.build == 'true'
+        with:
+          name: upstream-metadata
+          path: upstream-release.json
+          retention-days: 7
+  windows:
+    needs: resolve
+    if: needs.resolve.outputs.build == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    env:
+      RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+      UPSTREAM_SHA: ${{ needs.resolve.outputs.sha }}
+      RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout official release by immutable commit
+        uses: actions/checkout@v4
+        with:
+          repository: jlcodes99/cockpit-tools
+          ref: ${{ needs.resolve.outputs.sha }}
+          path: app
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: upstream-metadata
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app -> target
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: app/sidecars/cockpit-cliproxy/go.mod
+          cache-dependency-path: app/sidecars/cockpit-cliproxy/go.sum
+      - name: Install frontend dependencies
+        working-directory: app
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+        run: npm ci
+      - name: Apply patch and verify ordering
+        env:
+          TAURI_SIGNING_PUBLIC_KEY: ${{ vars.TAURI_SIGNING_PUBLIC_KEY }}
+        run: node scripts/customize.cjs app $env:GITHUB_REPOSITORY
+      - name: Compile signed Windows installer
+        working-directory: app
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          CARGO_BUILD_JOBS: '2'
+        run: |
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) { throw 'Updater signing key is not configured' }
+          npx tauri build --ci --bundles nsis
+      - name: Verify patched source after the build
+        run: |
+          $page = Get-Content app/src/pages/ZedAccountsPage.tsx -Raw
+          if ($page.Contains('compareCurrentAccountFirst')) { throw 'Zed active-account promotion returned' }
+      - name: Stage release artifacts
+        run: node scripts/package.cjs app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cockpit-windows-${{ needs.resolve.outputs.version }}
+          path: out/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Publish only a complete signed release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $repo = $env:GITHUB_REPOSITORY
+          gh release view $env:RELEASE_TAG --repo $repo --json isDraft *> $null
+          if ($LASTEXITCODE -eq 0) {
+            $draft = gh release view $env:RELEASE_TAG --repo $repo --json isDraft --jq '.isDraft'
+            if ($draft -ne 'true') { throw 'Refusing to replace a published version' }
+          } else {
+            gh release create $env:RELEASE_TAG --repo $repo --target $env:GITHUB_SHA --draft --title "Cockpit Tools $env:RELEASE_VERSION - Zed stable ordering" --notes-file release-notes.md
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create draft release' }
+          }
+          $assets = @(Get-ChildItem out -File | ForEach-Object { $_.FullName })
+          gh release upload $env:RELEASE_TAG --repo $repo --clobber @assets
+          if ($LASTEXITCODE -ne 0) { throw 'Could not upload all release assets' }
+          gh release edit $env:RELEASE_TAG --repo $repo --notes-file release-notes.md --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Could not publish release' }

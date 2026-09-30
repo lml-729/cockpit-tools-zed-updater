@@ -1,0 +1,6 @@
+.git/
+.keys/
+app/
+node_modules/
+out/
+*.key

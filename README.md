@@ -1,2 +1,47 @@
-# cockpit-tools-zed-updater
-Windows builds of Cockpit Tools tracking official releases while preserving stable Zed account ordering and signed in-app updates.
+# Cockpit Tools — 保留 Zed 顺序的个人更新渠道
+
+**当前状态：个人仓库已创建，配置正在 update-channel-setup 分支等待签名密钥配置；尚无新安装包发布。**
+
+目标账号：`lml-729`。默认发布仓库：`lml-729/cockpit-tools-zed-updater`。
+这个小仓库管理构建配置；每次从官方正式发布版本的固定提交获取完整源码并应用补丁。无需复制、合并官方的所有工作流。
+
+## 一次性配置
+
+这个仓库已经由助手配置，不需要运行 Deploy.ps1。该脚本仅供新仓库的独立部署参考，拒绝覆盖已有仓库。
+
+首次构建发布后，下载并安装一次 `x64-setup.exe`。退出旧的便携版，从安装版快捷方式启动。后续使用客户端的“检查更新／更新”，或开启原有自动安装更新选项。
+
+构建需要以下专用配置：
+
+- Actions Variable：`TAURI_SIGNING_PUBLIC_KEY`（客户端校验公钥）。
+- Actions Secrets：`TAURI_SIGNING_PRIVATE_KEY` 和 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`（加密私钥及密码）。
+
+私钥和密码不得提交到仓库或上传到 Release。丢失它们后，已有客户端无法信任用新密钥签名的更新。
+
+## 自动更新流程
+
+- 每小时第 23 分钟检查官方最新正式 Release；GitHub 调度可能延迟，不承诺官方发布后立即可用。
+- 以官方 Release 对应的固定 commit 构建，保留原作者署名与许可。
+- 在 Zed 页面移除当前账号置顶；同值账号按固定 ID 比较。
+- 从实际页面提取排序回调，覆盖排序方式、升降序、当前账号以及后台返回顺序，共 72 个场景。
+- 官方结构变更导致补丁或验证失败时，停止构建/发布，保留上一个可用版本。
+- 客户端唯一更新地址指向个人仓库的 `latest.json`，不回退到官方未修改包。
+- 生成 NSIS 安装包和其签名，先上传为草稿，再发布完整 Release，避免客户端读到不完整更新。
+- 程序版本跟随官方版本；同版本的定制修改不会触发新升级，需要维护者调整版本策略后发布。
+- 每 30 天更新一次监控时间文件，维持仓库活动，减少公开仓库长期无活动导致定时任务停用的情况；平台故障、账号限制、维护冲突仍可能需要处理。
+
+自动更新功能沿用官方已有界面。没有另建账号数据库，也没有打包任何 Zed 凭据。
+使用 Zed 时选择“按创建时间”，保持逐号使用顺序；金额/账期排序仍会随真实字段变化。
+
+## 验证与限制
+
+本地验证包括 JavaScript/YAML 语法、在当前官方源码应用补丁和 72 个排序场景、前端类型检查和生产构建、补丁遇到不兼容修改时停止。
+GitHub Actions 任务尚未实际运行，签名更新包尚未发布，未完成 Windows 客户端从旧版到新版的实机升级验收。
+首次通过构建并安装后，仍应完成一次真实升级检查。
+
+## 来源与许可
+
+原项目作者：jlcodes99 / jlcodes。
+原项目：<https://github.com/jlcodes99/cockpit-tools>。
+应用派生修改按原项目 CC BY-NC-SA 4.0 提供；原代码及其第三方许可保持原样。
+本次仅修改 Zed 排序和个人更新渠道，没有修复 Zed 金额接口的认证问题。
