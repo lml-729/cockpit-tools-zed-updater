@@ -64,37 +64,34 @@ function applyZedStudentAvailability(root) {
     `            token_spend_remaining_cents,\n            hosted_ai_available: bundle.hosted_ai_available,\n            hosted_ai_checked_at: bundle.hosted_ai_checked_at,\n            edit_predictions_used: pick_first_i64(&[\n`,
   );
 
-  letPage: {
-    let page = readText(pagePath);
-    const studentPanel = `      if (getZedPlanBadge(account) === 'STUDENT') {\n        const availabilityText =\n          account.hosted_ai_available === true\n            ? t('zed.page.hostedAiAvailable', '可用')\n            : account.hosted_ai_available === false\n              ? t('zed.page.hostedAiUnavailable', '不可用')\n              : t('zed.page.hostedAiUnknown', '未知');\n        const availabilityTone: 'high' | 'low' | 'medium' =\n          account.hosted_ai_available === true\n            ? 'high'\n            : account.hosted_ai_available === false\n              ? 'low'\n              : 'medium';\n        const checkedText = account.hosted_ai_checked_at\n          ? t('zed.page.hostedAiCheckedAt', {\n              time: formatDateTime(account.hosted_ai_checked_at, locale),\n              defaultValue: '检测时间：{{time}}',\n            })\n          : '';\n        return {\n          headline: '',\n          note: checkedText,\n          items: [\n            {\n              key: 'hosted-ai',\n              variant: 'simple',\n              label: 'Hosted AI',\n              value: availabilityText,\n              detail: '',\n              title: \\`Hosted AI: \\${availabilityText}\\`,\n              tone: availabilityTone,\n            },\n          ],\n          title: checkedText\n            ? \\`Hosted AI: \\${availabilityText} | \\${checkedText}\\`\n            : \\`Hosted AI: \\${availabilityText}\\`,\n        };\n      }\n\n`;
-    const patchedPage = replaceOnce(
-      page,
-      `      if (!hasZedQuotaData(account)) {\n`,
-      studentPanel + `      if (!hasZedQuotaData(account)) {\n`,
-    );
+  const page = readText(pagePath);
+  const studentPanel = `      if (getZedPlanBadge(account) === 'STUDENT') {\n        const availabilityText =\n          account.hosted_ai_available === true\n            ? t('zed.page.hostedAiAvailable', '可用')\n            : account.hosted_ai_available === false\n              ? t('zed.page.hostedAiUnavailable', '不可用')\n              : t('zed.page.hostedAiUnknown', '未知');\n        const availabilityTone: 'high' | 'low' | 'medium' =\n          account.hosted_ai_available === true\n            ? 'high'\n            : account.hosted_ai_available === false\n              ? 'low'\n              : 'medium';\n        const checkedText = account.hosted_ai_checked_at\n          ? t('zed.page.hostedAiCheckedAt', {\n              time: formatDateTime(account.hosted_ai_checked_at, locale),\n              defaultValue: '检测时间：{{time}}',\n            })\n          : '';\n        return {\n          headline: '',\n          note: checkedText,\n          items: [\n            {\n              key: 'hosted-ai',\n              variant: 'simple',\n              label: 'Hosted AI',\n              value: availabilityText,\n              detail: '',\n              title: 'Hosted AI: ' + availabilityText,\n              tone: availabilityTone,\n            },\n          ],\n          title: checkedText\n            ? 'Hosted AI: ' + availabilityText + ' | ' + checkedText\n            : 'Hosted AI: ' + availabilityText,\n        };\n      }\n\n`;
+  const patchedPage = replaceOnce(
+    page,
+    `      if (!hasZedQuotaData(account)) {\n`,
+    studentPanel + `      if (!hasZedQuotaData(account)) {\n`,
+  );
 
-    if (!rustAccount.includes('"/client/llm_tokens"')) {
-      throw new Error('Hosted AI probe endpoint patch is missing');
-    }
-    if (rustAccount.includes('"/completions"')) {
-      throw new Error('Availability patch must not send model completion requests');
-    }
-    if (!patchedPage.includes("getZedPlanBadge(account) === 'STUDENT'")) {
-      throw new Error('Student availability UI patch is missing');
-    }
-    if (!rustModel.includes('pub hosted_ai_available: Option<bool>')) {
-      throw new Error('Rust Zed account availability field is missing');
-    }
-    if (!tsType.includes('hosted_ai_available?: boolean | null')) {
-      throw new Error('TypeScript Zed account availability field is missing');
-    }
-
-    fs.writeFileSync(pagePath, patchedPage);
+  if (!rustAccount.includes('"/client/llm_tokens"')) {
+    throw new Error('Hosted AI probe endpoint patch is missing');
+  }
+  if (rustAccount.includes('"/completions"')) {
+    throw new Error('Availability patch must not send model completion requests');
+  }
+  if (!patchedPage.includes("getZedPlanBadge(account) === 'STUDENT'")) {
+    throw new Error('Student availability UI patch is missing');
+  }
+  if (!rustModel.includes('pub hosted_ai_available: Option<bool>')) {
+    throw new Error('Rust Zed account availability field is missing');
+  }
+  if (!tsType.includes('hosted_ai_available?: boolean | null')) {
+    throw new Error('TypeScript Zed account availability field is missing');
   }
 
   fs.writeFileSync(rustModelPath, rustModel);
   fs.writeFileSync(rustAccountPath, rustAccount);
   fs.writeFileSync(tsTypePath, tsType);
+  fs.writeFileSync(pagePath, patchedPage);
 
   console.log('Applied Zed Student Hosted AI availability probe (no completion request).');
 }
