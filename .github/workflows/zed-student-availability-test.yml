@@ -4,6 +4,8 @@ on:
     branches: [zed-student-availability]
     paths:
       - 'scripts/zed-student-availability.cjs'
+      - 'scripts/zed-student-hosted-ai.rs'
+      - 'scripts/zed-student-availability.test.cjs'
       - 'scripts/customize.cjs'
       - '.github/workflows/zed-student-availability-test.yml'
   workflow_dispatch:
@@ -42,6 +44,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: app -> target
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: app/sidecars/cockpit-cliproxy/go.mod
       - name: Install frontend dependencies
         working-directory: app
         env:
@@ -52,22 +57,32 @@ jobs:
         env:
           TAURI_SIGNING_PUBLIC_KEY: dGVzdA==
         run: node scripts/customize.cjs app $env:GITHUB_REPOSITORY
-      - name: Apply Student availability patch
-        run: node scripts/zed-student-availability.cjs app
+      - name: Test and apply Student availability patch
+        run: |
+          node scripts/zed-student-availability.test.cjs app
+          if ($LASTEXITCODE -ne 0) { throw 'Student patch regression tests failed' }
+          node scripts/zed-student-availability.cjs app
+          if ($LASTEXITCODE -ne 0) { throw 'Student availability patch failed' }
       - name: Typecheck frontend
         working-directory: app
         run: npm run typecheck
       - name: Check Rust backend
         working-directory: app
         run: cargo check --manifest-path src-tauri/Cargo.toml --lib
-      - name: Verify probe is non-consuming and Student-only UI exists
+      - name: Test Hosted AI stream and failure classification
+        working-directory: app
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib zed_hosted_ai_tests
+      - name: Verify one-token probe and Student-only UI exists
         shell: pwsh
         run: |
           $backend = Get-Content app/src-tauri/src/modules/zed_account.rs -Raw
+          $probe = Get-Content app/src-tauri/src/modules/zed_student_hosted_ai.rs -Raw
           $page = Get-Content app/src/pages/ZedAccountsPage.tsx -Raw
           $model = Get-Content app/src-tauri/src/models/zed.rs -Raw
-          if (-not $backend.Contains('/client/llm_tokens')) { throw 'LLM token probe missing' }
-          if ($backend.Contains('/completions')) { throw 'Patch must not issue completion requests' }
-          if (-not $backend.Contains('reqwest::StatusCode::PAYMENT_REQUIRED')) { throw '402 classification missing' }
+          if (-not $probe.Contains('/client/llm_tokens')) { throw 'LLM token probe missing' }
+          if (-not $probe.Contains('/completions')) { throw 'Completion gateway probe missing' }
+          if (-not $probe.Contains('"max_tokens": 1')) { throw 'One-token output cap missing' }
+          if (-not $probe.Contains('stream_ended')) { throw 'Stream completion check missing' }
+          if (-not $probe.Contains('payment_required')) { throw '402 classification missing' }
           if (-not $page.Contains("getZedPlanBadge(account) === 'STUDENT'")) { throw 'Student UI branch missing' }
           if (-not $model.Contains('hosted_ai_available')) { throw 'Availability field missing' }
