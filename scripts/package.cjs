@@ -17,7 +17,7 @@ function main(){
   if(!signature)throw new Error('Missing update signature');
   const name=`Cockpit.Tools_${version}_x64-setup.exe`;
   fs.mkdirSync('out',{recursive:true});fs.copyFileSync(original,path.join('out',name));fs.writeFileSync(path.join('out',name+'.sig'),signature+'\n');
-  const notes='Zed 定制版：切换当前账号不置顶；Student 计划刷新时只检测 Hosted AI 是否可用，不发起模型 completion，也不计算美元余额。\n\n基于官方 '+upstreamTag+'\n\n'+(upstream.body||'');
+  const notes='Zed 定制版：切换当前账号不置顶；修正 Student Hosted AI 可用性检测，刷新时通过最多 1 个输出 token 的极小网关探针识别 token_spend_limit_reached，不计算美元余额。\n\n基于官方 '+upstreamTag+'\n\n'+(upstream.body||'');
   fs.writeFileSync('release-notes.md',notes+'\n');
   const target={url:`https://github.com/${repo}/releases/download/v${version}/${name}`,signature};
   const manifest={version,notes,pub_date:new Date().toISOString(),html_url:`https://github.com/${repo}/releases/tag/v${version}`,platforms:{'windows-x86_64':target,'windows-x86_64-nsis':target}};
