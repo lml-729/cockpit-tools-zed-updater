@@ -24,6 +24,7 @@ jobs:
       upstream_tag: ${{ steps.upstream.outputs.upstream_tag }}
       upstream_version: ${{ steps.upstream.outputs.upstream_version }}
       sha: ${{ steps.upstream.outputs.sha }}
+      config_sha: ${{ steps.upstream.outputs.config_sha }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -62,6 +63,7 @@ jobs:
       UPSTREAM_VERSION: ${{ needs.resolve.outputs.upstream_version }}
       UPSTREAM_TAG: ${{ needs.resolve.outputs.upstream_tag }}
       UPSTREAM_SHA: ${{ needs.resolve.outputs.sha }}
+      CONFIG_SHA: ${{ needs.resolve.outputs.config_sha }}
     steps:
       - uses: actions/checkout@v4
       - name: Checkout official release by immutable commit
@@ -151,7 +153,7 @@ jobs:
             $draft = gh release view $env:RELEASE_TAG --repo $repo --json isDraft --jq '.isDraft'
             if ($draft -ne 'true') { throw 'Refusing to replace a published version' }
           } else {
-            gh release create $env:RELEASE_TAG --repo $repo --target $env:GITHUB_SHA --draft --title "Cockpit Tools $env:RELEASE_VERSION - Zed customizations" --notes-file release-notes.md
+            gh release create $env:RELEASE_TAG --repo $repo --target $env:CONFIG_SHA --draft --title "Cockpit Tools $env:RELEASE_VERSION - Zed customizations" --notes-file release-notes.md
             if ($LASTEXITCODE -ne 0) { throw 'Could not create draft release' }
           }
           $assets = @(Get-ChildItem out -File | ForEach-Object { $_.FullName })
