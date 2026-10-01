@@ -21,6 +21,8 @@ jobs:
       build: ${{ steps.upstream.outputs.build }}
       tag: ${{ steps.upstream.outputs.tag }}
       version: ${{ steps.upstream.outputs.version }}
+      upstream_tag: ${{ steps.upstream.outputs.upstream_tag }}
+      upstream_version: ${{ steps.upstream.outputs.upstream_version }}
       sha: ${{ steps.upstream.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
@@ -56,8 +58,10 @@ jobs:
       contents: write
     env:
       RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
-      UPSTREAM_SHA: ${{ needs.resolve.outputs.sha }}
       RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+      UPSTREAM_VERSION: ${{ needs.resolve.outputs.upstream_version }}
+      UPSTREAM_TAG: ${{ needs.resolve.outputs.upstream_tag }}
+      UPSTREAM_SHA: ${{ needs.resolve.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
       - name: Checkout official release by immutable commit
@@ -94,18 +98,24 @@ jobs:
         run: |
           node scripts/customize.cjs app $env:GITHUB_REPOSITORY
           node scripts/zed-student-availability.cjs app
+      - name: Set release version for this customized build
+        shell: pwsh
+        run: |
+          node -e "const fs=require('fs');const p='app/package.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));j.version=process.env.RELEASE_VERSION;fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n');"
       - name: Verify patched source before build
         shell: pwsh
         run: |
           $page = Get-Content app/src/pages/ZedAccountsPage.tsx -Raw
           $backend = Get-Content app/src-tauri/src/modules/zed_account.rs -Raw
           $model = Get-Content app/src-tauri/src/models/zed.rs -Raw
+          $package = Get-Content app/package.json -Raw | ConvertFrom-Json
           if ($page.Contains('compareCurrentAccountFirst')) { throw 'Zed active-account promotion returned' }
           if (-not $backend.Contains('/client/llm_tokens')) { throw 'Student Hosted AI probe missing' }
           if ($backend.Contains('"/completions"')) { throw 'Availability probe must not issue model completions' }
           if (-not $backend.Contains('reqwest::StatusCode::PAYMENT_REQUIRED')) { throw '402 availability classification missing' }
           if (-not $page.Contains("getZedPlanBadge(account) === 'STUDENT'")) { throw 'Student-only availability UI missing' }
           if (-not $model.Contains('hosted_ai_available')) { throw 'Availability model field missing' }
+          if ($package.version -ne $env:RELEASE_VERSION) { throw 'Customized release version was not applied' }
       - name: Compile signed Windows installer
         working-directory: app
         env:
