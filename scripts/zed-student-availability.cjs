@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+// Patched against the official stable Cockpit source and validated in GitHub Actions.
 function replaceOnce(text, from, to) {
   if (text.split(from).length !== 2) {
     throw new Error(`Upstream source changed; expected exactly one patch anchor: ${from.slice(0, 80)}`);
