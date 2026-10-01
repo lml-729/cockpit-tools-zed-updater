@@ -94,7 +94,7 @@ jobs:
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
         run: npm ci
-      - name: Apply Zed ordering and Student availability patches
+      - name: Apply Zed ordering and Student gateway availability patches
         env:
           TAURI_SIGNING_PUBLIC_KEY: ${{ vars.TAURI_SIGNING_PUBLIC_KEY }}
         run: |
@@ -112,9 +112,11 @@ jobs:
           $model = Get-Content app/src-tauri/src/models/zed.rs -Raw
           $package = Get-Content app/package.json -Raw | ConvertFrom-Json
           if ($page.Contains('compareCurrentAccountFirst')) { throw 'Zed active-account promotion returned' }
-          if (-not $backend.Contains('/client/llm_tokens')) { throw 'Student Hosted AI probe missing' }
-          if ($backend.Contains('"/completions"')) { throw 'Availability probe must not issue model completions' }
-          if (-not $backend.Contains('reqwest::StatusCode::PAYMENT_REQUIRED')) { throw '402 availability classification missing' }
+          if (-not $backend.Contains('/client/llm_tokens')) { throw 'Student LLM-token exchange missing' }
+          if (-not $backend.Contains('"/models"')) { throw 'Student Hosted AI model-list probe missing' }
+          if (-not $backend.Contains('"/completions"')) { throw 'Student Hosted AI completion-gateway probe missing' }
+          if (-not $backend.Contains('token_spend_limit_reached')) { throw 'Student credit exhaustion classification missing' }
+          if (-not $backend.Contains('"max_tokens": 1')) { throw 'Student availability probe is not capped to one output token' }
           if (-not $page.Contains("getZedPlanBadge(account) === 'STUDENT'")) { throw 'Student-only availability UI missing' }
           if (-not $model.Contains('hosted_ai_available')) { throw 'Availability model field missing' }
           if ($package.version -ne $env:RELEASE_VERSION) { throw 'Customized release version was not applied' }
@@ -133,8 +135,11 @@ jobs:
           $page = Get-Content app/src/pages/ZedAccountsPage.tsx -Raw
           $backend = Get-Content app/src-tauri/src/modules/zed_account.rs -Raw
           if ($page.Contains('compareCurrentAccountFirst')) { throw 'Zed active-account promotion returned' }
-          if (-not $backend.Contains('/client/llm_tokens')) { throw 'Student Hosted AI availability probe disappeared' }
-          if ($backend.Contains('"/completions"')) { throw 'Student availability probe became consuming' }
+          if (-not $backend.Contains('/client/llm_tokens')) { throw 'Student LLM-token exchange disappeared' }
+          if (-not $backend.Contains('"/models"')) { throw 'Student model-list probe disappeared' }
+          if (-not $backend.Contains('"/completions"')) { throw 'Student completion-gateway probe disappeared' }
+          if (-not $backend.Contains('token_spend_limit_reached')) { throw 'Student credit exhaustion classification disappeared' }
+          if (-not $backend.Contains('"max_tokens": 1')) { throw 'Student probe output cap disappeared' }
       - name: Stage release artifacts
         run: node scripts/package.cjs app
       - uses: actions/upload-artifact@v4
