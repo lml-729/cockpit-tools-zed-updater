@@ -1,4 +1,4 @@
-name: Follow official releases and publish stable Zed ordering
+name: Follow official releases and publish Zed customizations
 on:
   schedule:
     - cron: '23 * * * *'
@@ -88,10 +88,24 @@ jobs:
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
         run: npm ci
-      - name: Apply patch and verify ordering
+      - name: Apply Zed ordering and Student availability patches
         env:
           TAURI_SIGNING_PUBLIC_KEY: ${{ vars.TAURI_SIGNING_PUBLIC_KEY }}
-        run: node scripts/customize.cjs app $env:GITHUB_REPOSITORY
+        run: |
+          node scripts/customize.cjs app $env:GITHUB_REPOSITORY
+          node scripts/zed-student-availability.cjs app
+      - name: Verify patched source before build
+        shell: pwsh
+        run: |
+          $page = Get-Content app/src/pages/ZedAccountsPage.tsx -Raw
+          $backend = Get-Content app/src-tauri/src/modules/zed_account.rs -Raw
+          $model = Get-Content app/src-tauri/src/models/zed.rs -Raw
+          if ($page.Contains('compareCurrentAccountFirst')) { throw 'Zed active-account promotion returned' }
+          if (-not $backend.Contains('/client/llm_tokens')) { throw 'Student Hosted AI probe missing' }
+          if ($backend.Contains('"/completions"')) { throw 'Availability probe must not issue model completions' }
+          if (-not $backend.Contains('reqwest::StatusCode::PAYMENT_REQUIRED')) { throw '402 availability classification missing' }
+          if (-not $page.Contains("getZedPlanBadge(account) === 'STUDENT'")) { throw 'Student-only availability UI missing' }
+          if (-not $model.Contains('hosted_ai_available')) { throw 'Availability model field missing' }
       - name: Compile signed Windows installer
         working-directory: app
         env:
@@ -101,10 +115,14 @@ jobs:
         run: |
           if (-not $env:TAURI_SIGNING_PRIVATE_KEY) { throw 'Updater signing key is not configured' }
           npx tauri build --ci --bundles nsis
-      - name: Verify patched source after the build
+      - name: Verify customizations after the build
+        shell: pwsh
         run: |
           $page = Get-Content app/src/pages/ZedAccountsPage.tsx -Raw
+          $backend = Get-Content app/src-tauri/src/modules/zed_account.rs -Raw
           if ($page.Contains('compareCurrentAccountFirst')) { throw 'Zed active-account promotion returned' }
+          if (-not $backend.Contains('/client/llm_tokens')) { throw 'Student Hosted AI availability probe disappeared' }
+          if ($backend.Contains('"/completions"')) { throw 'Student availability probe became consuming' }
       - name: Stage release artifacts
         run: node scripts/package.cjs app
       - uses: actions/upload-artifact@v4
@@ -123,7 +141,7 @@ jobs:
             $draft = gh release view $env:RELEASE_TAG --repo $repo --json isDraft --jq '.isDraft'
             if ($draft -ne 'true') { throw 'Refusing to replace a published version' }
           } else {
-            gh release create $env:RELEASE_TAG --repo $repo --target $env:GITHUB_SHA --draft --title "Cockpit Tools $env:RELEASE_VERSION - Zed stable ordering" --notes-file release-notes.md
+            gh release create $env:RELEASE_TAG --repo $repo --target $env:GITHUB_SHA --draft --title "Cockpit Tools $env:RELEASE_VERSION - Zed customizations" --notes-file release-notes.md
             if ($LASTEXITCODE -ne 0) { throw 'Could not create draft release' }
           }
           $assets = @(Get-ChildItem out -File | ForEach-Object { $_.FullName })
