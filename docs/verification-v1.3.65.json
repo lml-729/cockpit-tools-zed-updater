@@ -1,0 +1,87 @@
+{
+  "checked_at": "2026-10-01T19:14:26.396248+00:00",
+  "tag": "v1.3.65",
+  "repository": "lml-729/cockpit-tools-zed-updater",
+  "checks": {
+    "sha256": {
+      "passed": true,
+      "assets": {
+        "BUILD-INFO.txt": {
+          "bytes": 227,
+          "sha256": "81673a9aa72eb39db726538e7af07f413a66c6239d8cb3231ffc84277782115f"
+        },
+        "Cockpit.Tools_1.3.65_x64-portable.zip": {
+          "bytes": 53504870,
+          "sha256": "879fe47c28b5f7ee8fa05bd0f1b5b99918f94d18a6f5e9f2780ac5dc22936b78"
+        },
+        "Cockpit.Tools_1.3.65_x64-setup.exe": {
+          "bytes": 37755510,
+          "sha256": "f92247d7168616019d9158500c563edda8303f707c87d6a832ddb694c74cb74e"
+        },
+        "Cockpit.Tools_1.3.65_x64-setup.exe.sig": {
+          "bytes": 429,
+          "sha256": "7c24cad38942d5828ba4f730c173911a1781399fba9e9e2140b12c2cb9cb65f5"
+        },
+        "latest.json": {
+          "bytes": 3617,
+          "sha256": "b1c115e657cf0b3f3d926db5110b8d2a5ae07a3b09a0b90560742d06c0778e3c"
+        }
+      }
+    },
+    "fixed_source": {
+      "passed": true,
+      "upstream": "https://github.com/jlcodes99/cockpit-tools/releases/tag/v1.3.65",
+      "upstream_tag": "v1.3.65",
+      "upstream_commit": "0b6514b40880efdfd7752ebd5113c6811bafe721",
+      "custom_version": "1.3.65",
+      "build_config": "303b01c43611c4546f373399d719def874351fbd"
+    },
+    "updater_manifest": {
+      "passed": true,
+      "version": "1.3.65",
+      "platforms": [
+        "windows-x86_64",
+        "windows-x86_64-nsis"
+      ],
+      "installer_url": "https://github.com/lml-729/cockpit-tools-zed-updater/releases/download/v1.3.65/Cockpit.Tools_1.3.65_x64-setup.exe"
+    },
+    "portable": {
+      "passed": true,
+      "entry_count": 20,
+      "entries": [
+        "Cockpit.Tools_1.3.65_x64-portable/cockpit-cliproxy.exe",
+        "Cockpit.Tools_1.3.65_x64-portable/cockpit-tools.exe",
+        "Cockpit.Tools_1.3.65_x64-portable/native-menu-icons/antigravity-menu.png",
+        "Cockpit.Tools_1.3.65_x64-portable/native-menu-icons/claude.png",
+        "Cockpit.Tools_1.3.65_x64-portable/native-menu-icons/codebuddy.png",
+        "Cockpit.Tools_1.3.65_x64-portable/native-menu-icons/codex.svg",
+        "Cockpit.Tools_1.3.65_x64-portable/native-menu-icons/cursor-menu.png",
+        "Cockpit.Tools_1.3.65_x64-portable/native-menu-icons/github-copilot.svg",
+        "Cockpit.Tools_1.3.65_x64-portable/native-menu-icons/kiro-menu.png",
+        "Cockpit.Tools_1.3.65_x64-portable/native-menu-icons/qoder.png",
+        "Cockpit.Tools_1.3.65_x64-portable/native-menu-icons/trae-cn.png",
+        "Cockpit.Tools_1.3.65_x64-portable/native-menu-icons/trae-solo-cn.png",
+        "Cockpit.Tools_1.3.65_x64-portable/native-menu-icons/trae-solo.png",
+        "Cockpit.Tools_1.3.65_x64-portable/native-menu-icons/trae.png",
+        "Cockpit.Tools_1.3.65_x64-portable/native-menu-icons/windsurf.svg",
+        "Cockpit.Tools_1.3.65_x64-portable/native-menu-icons/workbuddy.png",
+        "Cockpit.Tools_1.3.65_x64-portable/native-menu-icons/zcode.png",
+        "Cockpit.Tools_1.3.65_x64-portable/native-menu-icons/zed.png",
+        "Cockpit.Tools_1.3.65_x64-portable/scripts/claude-desktop-auth-helper.cjs",
+        "Cockpit.Tools_1.3.65_x64-portable/README.txt"
+      ]
+    },
+    "installer_pe_version": {
+      "passed": true,
+      "FileVersion": "1.3.65",
+      "ProductVersion": "1.3.65"
+    },
+    "minisign": {
+      "passed": true,
+      "exit_code": 0,
+      "stdout": "Production updater signature verified against configured public key.",
+      "stderr": ""
+    }
+  },
+  "passed": true
+}
