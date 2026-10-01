@@ -1,0 +1,73 @@
+name: Test Zed Student availability patch
+on:
+  push:
+    branches: [zed-student-availability]
+    paths:
+      - 'scripts/zed-student-availability.cjs'
+      - 'scripts/customize.cjs'
+      - '.github/workflows/zed-student-availability-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve latest official stable release
+        id: upstream
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = gh api repos/jlcodes99/cockpit-tools/releases/latest --jq '.tag_name'
+          if (-not $tag) { throw 'Could not resolve upstream release tag' }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+      - name: Checkout official release
+        uses: actions/checkout@v4
+        with:
+          repository: jlcodes99/cockpit-tools
+          ref: ${{ steps.upstream.outputs.tag }}
+          path: app
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app -> target
+      - name: Install frontend dependencies
+        working-directory: app
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+        run: npm ci
+      - name: Apply existing stable-ordering patch
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PUBLIC_KEY: dGVzdA==
+        run: node scripts/customize.cjs app $env:GITHUB_REPOSITORY
+      - name: Apply Student availability patch
+        run: node scripts/zed-student-availability.cjs app
+      - name: Typecheck frontend
+        working-directory: app
+        run: npm run typecheck
+      - name: Check Rust backend
+        working-directory: app
+        run: cargo check --manifest-path src-tauri/Cargo.toml --lib
+      - name: Verify probe is non-consuming and Student-only UI exists
+        shell: pwsh
+        run: |
+          $backend = Get-Content app/src-tauri/src/modules/zed_account.rs -Raw
+          $page = Get-Content app/src/pages/ZedAccountsPage.tsx -Raw
+          $model = Get-Content app/src-tauri/src/models/zed.rs -Raw
+          if (-not $backend.Contains('/client/llm_tokens')) { throw 'LLM token probe missing' }
+          if ($backend.Contains('/completions')) { throw 'Patch must not issue completion requests' }
+          if (-not $backend.Contains('reqwest::StatusCode::PAYMENT_REQUIRED')) { throw '402 classification missing' }
+          if (-not $page.Contains("getZedPlanBadge(account) === 'STUDENT'")) { throw 'Student UI branch missing' }
+          if (-not $model.Contains('hosted_ai_available')) { throw 'Availability field missing' }
