@@ -17,13 +17,13 @@ function main(){
   if(!signature)throw new Error('Missing update signature');
   const name=`Cockpit.Tools_${version}_x64-setup.exe`;
   fs.mkdirSync('out',{recursive:true});fs.copyFileSync(original,path.join('out',name));fs.writeFileSync(path.join('out',name+'.sig'),signature+'\n');
-  const notes='Zed 定制版：切换当前账号不置顶；修正 Student Hosted AI 可用性检测，刷新时通过最多 1 个输出 token 的极小网关探针识别 token_spend_limit_reached，不计算美元余额。\n\n基于官方 '+upstreamTag+'\n\n'+(upstream.body||'');
+  const notes='Zed 定制版：切换当前账号不置顶；Student Hosted AI 检测完整读取极小请求的网关响应，识别学生额度耗尽与权限错误，旧检测缓存和导入快照需刷新后重新验证。每次探测最多 1 个输出 token，不计算美元余额。便携包已补齐程序资源。\n\n基于官方 '+upstreamTag+'\n\n'+(upstream.body||'');
   fs.writeFileSync('release-notes.md',notes+'\n');
   const target={url:`https://github.com/${repo}/releases/download/v${version}/${name}`,signature};
   const manifest={version,notes,pub_date:new Date().toISOString(),html_url:`https://github.com/${repo}/releases/tag/v${version}`,platforms:{'windows-x86_64':target,'windows-x86_64-nsis':target}};
   fs.writeFileSync('out/latest.json',JSON.stringify(manifest,null,2)+'\n');
-  const source=require(path.join(app,'scripts/release/build_windows_portable.cjs'));
-  source.buildWindowsPortableArchive({releaseDir:path.join(app,'target/release'),outputDir:path.resolve('out'),version});
+  const source=require('./windows-portable.cjs');
+  source.buildWindowsPortableArchive({app,releaseDir:path.join(app,'target/release'),outputDir:path.resolve('out'),version});
   fs.writeFileSync('out/BUILD-INFO.txt',`upstream=${upstream.html_url}\nupstream_tag=${upstreamTag}\nupstream_commit=${process.env.UPSTREAM_SHA}\ncustom_version=${version}\nbuild_config=${configSha}\n`);
   fs.writeFileSync('out/SHA256SUMS.txt',fs.readdirSync('out').sort().filter(n=>n!=='SHA256SUMS.txt').map(n=>crypto.createHash('sha256').update(fs.readFileSync(path.join('out',n))).digest('hex')+'  '+n).join('\n')+'\n');
   console.log('Staged signed installer, portable archive and personal updater manifest.');

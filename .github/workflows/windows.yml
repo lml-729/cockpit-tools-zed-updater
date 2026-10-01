@@ -155,7 +155,11 @@ jobs:
           if (-not $probe.Contains('token_spend_limit_reached')) { throw 'Student credit exhaustion classification disappeared' }
           if (-not $probe.Contains('"max_tokens": 1')) { throw 'Student probe output cap disappeared' }
       - name: Stage release artifacts
-        run: node scripts/package.cjs app
+        run: |
+          node scripts/windows-portable.test.cjs app
+          if ($LASTEXITCODE -ne 0) { throw 'Portable resource regression tests failed' }
+          node scripts/package.cjs app
+          if ($LASTEXITCODE -ne 0) { throw 'Release packaging failed' }
       - uses: actions/upload-artifact@v4
         with:
           name: cockpit-windows-${{ needs.resolve.outputs.version }}
