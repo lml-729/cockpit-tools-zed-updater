@@ -73,7 +73,7 @@ function applyZedStudentAvailability(root) {
     studentPanel + `      if (!hasZedQuotaData(account)) {\n`,
   );
 
-  if (!rustAccount.includes('"/client/llm_tokens"')) {
+  if (!rustAccount.includes('/client/llm_tokens')) {
     throw new Error('Hosted AI probe endpoint patch is missing');
   }
   if (rustAccount.includes('"/completions"')) {
